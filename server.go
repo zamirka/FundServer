@@ -6,7 +6,7 @@ import (
 
 // FundServer servers all requests to the Fund
 type FundServer struct {
-	Commands chan interface{}
+	commands chan interface{}
 	fund     *Fund
 }
 
@@ -14,7 +14,7 @@ type FundServer struct {
 func NewFundServer(initialBalance int) *FundServer {
 	server := &FundServer{
 		// make creates builtins like channels, maps and slices
-		Commands: make(chan interface{}),
+		commands: make(chan interface{}),
 		fund:     NewFund(initialBalance),
 	}
 
@@ -26,7 +26,7 @@ func NewFundServer(initialBalance int) *FundServer {
 func (s *FundServer) loop() {
 	// the built-in "range" clause can interate over channels,
 	// amongst other things
-	for command := range s.Commands {
+	for command := range s.commands {
 		// Handle the command
 
 		// command is just an interface{}, but we can check its real type
@@ -58,14 +58,14 @@ type BalanceCommand struct {
 	Response chan int
 }
 
-// Balance is a member that renurns balance of a fund
+// Balance is a member that returns balance of a fund
 func (s *FundServer) Balance() int {
 	responseChan := make(chan int)
-	s.Commands <- BalanceCommand{Response: responseChan}
+	s.commands <- BalanceCommand{Response: responseChan}
 	return <-responseChan
 }
 
 // Withdraw excludes given amount from the funds balance
 func (s *FundServer) Withdraw(amount int) {
-	s.Commands <- WithdrawCommand{Amount: amount}
+	s.commands <- WithdrawCommand{Amount: amount}
 }
