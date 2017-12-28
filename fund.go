@@ -11,3 +11,13 @@ func NewFund(initialBalance int) *Fund {
 		balance: initialBalance,
 	}
 }
+
+// Balance is a member that renurns balance of a fund
+func (f *Fund) Balance() int {
+	return f.balance
+}
+
+// Withdraw excludes given amount from the funds balance
+func (f *Fund) Withdraw(amount int) {
+	f.balance -= amount
+}
