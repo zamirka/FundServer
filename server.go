@@ -1,12 +1,8 @@
 package funding
 
-import (
-	"fmt"
-)
-
 // FundServer servers all requests to the Fund
 type FundServer struct {
-	commands chan interface{}
+	commands chan TransactionCommand
 	fund     *Fund
 }
 
@@ -14,7 +10,7 @@ type FundServer struct {
 func NewFundServer(initialBalance int) *FundServer {
 	server := &FundServer{
 		// make creates builtins like channels, maps and slices
-		commands: make(chan interface{}),
+		commands: make(chan TransactionCommand),
 		fund:     NewFund(initialBalance),
 	}
 
@@ -24,48 +20,44 @@ func NewFundServer(initialBalance int) *FundServer {
 }
 
 func (s *FundServer) loop() {
-	// the built-in "range" clause can interate over channels,
-	// amongst other things
-	for command := range s.commands {
-		// Handle the command
-
-		// command is just an interface{}, but we can check its real type
-		switch command.(type) {
-
-		case WithdrawCommand:
-			// Add then use a "type assertion" to convert it
-			withdrawal := command.(WithdrawCommand)
-			s.fund.Withdraw(withdrawal.Amount)
-
-		case BalanceCommand:
-			getBalance := command.(BalanceCommand)
-			balance := s.fund.Balance()
-			getBalance.Response <- balance
-
-		default:
-			panic(fmt.Sprintf("Unrecognized command: %v", command))
-		}
+	for transaction := range s.commands {
+		//Now we don't need any type-switch mess
+		transaction.Transactor(s.fund)
+		transaction.Done <- true
 	}
 }
 
-// WithdrawCommand a type to pass a command to server to withdraw somw amout
-type WithdrawCommand struct {
-	Amount int
-}
+// Transactor is a callback function which really executes some commands over fund in TransactionCommand
+type Transactor func(fund *Fund)
 
-// BalanceCommand  a type of command that contains a channels through wich resposnse is returned from server
-type BalanceCommand struct {
-	Response chan int
+// TransactionCommand is a type of command which can be passed to the server to do some stuff with Fund
+type TransactionCommand struct {
+	Transactor Transactor
+	Done       chan bool
 }
 
 // Balance is a member that returns balance of a fund
 func (s *FundServer) Balance() int {
-	responseChan := make(chan int)
-	s.commands <- BalanceCommand{Response: responseChan}
-	return <-responseChan
+	var balance int
+	s.Transact(func(f *Fund) {
+		balance = f.Balance()
+	})
+	return balance
 }
 
 // Withdraw excludes given amount from the funds balance
 func (s *FundServer) Withdraw(amount int) {
-	s.commands <- WithdrawCommand{Amount: amount}
+	s.Transact(func(f *Fund) {
+		f.Withdraw(amount)
+	})
+}
+
+// Transact is a function that sends a transactionCommand to the server
+func (s *FundServer) Transact(transactor Transactor) {
+	command := TransactionCommand{
+		Transactor: transactor,
+		Done:       make(chan bool),
+	}
+	s.commands <- command
+	<-command.Done
 }

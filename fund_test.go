@@ -31,8 +31,21 @@ func BenchmarkWithdrawals(b *testing.B) {
 			// Mark this worker done when the functions finishes
 			defer wg.Done()
 
+			pizzaTime := false
+
 			for i := 0; i < dollarsPerFounder; i++ {
-				server.Withdraw(1)
+				server.Transact(func(fund *Fund) {
+					if fund.Balance() <= 10 {
+						//Set it in the outside scope
+						pizzaTime = true
+						return
+					}
+					fund.Withdraw(1)
+				})
+
+				if pizzaTime {
+					break
+				}
 			}
 		}() // Remember to call the closure!
 	}
@@ -42,8 +55,8 @@ func BenchmarkWithdrawals(b *testing.B) {
 
 	balance := server.Balance()
 
-	if balance != 0 {
-		b.Error("Balance wasn't zero:", balance)
+	if balance != 10 {
+		b.Error("Balance wasn't ten dollars:", balance)
 	}
 
 }
